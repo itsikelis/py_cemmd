@@ -17,16 +17,33 @@ def eval_pop(input):
     xd = input[0]
     xc = input[1]
 
+    xd[0] += 1
+
+    n_jumps = xd[0] + 1
+    ids = []
+    for i in range(n_jumps):
+        ids += [xd[1 + i]]
+
+    print(n_jumps, ids)
+
+    fitness = 0.0
     ## Run trajectory optimisation here ##
+    p0 = P0_INIT
+    for i in range(n_jumps):
+        res = eng.optimize_cpp_mex(
+            matlab.double(p0), matlab.double(pf), Fleg_max, Fr_max, Fr_min, mu, params
+        )
+        fitness += calc_fitness(res)
+        p0 = res["pf"]
+        pass
 
     ## Calculate fitness (by default the algorithm maximises) ##
-    fitness = 0.0
-    if xd[0] == 0:
-        fitness += 50
-    if xd[1] == 1:
-        fitness += 100
-    for num in xc:
-        fitness += -((num - 1.5) ** 2)
+    # if xd[0] == 0:
+    #     fitness += 50
+    # if xd[1] == 1:
+    #     fitness += 100
+    # for num in xc:
+    #     fitness += -((num - 1.5) ** 2)
     return fitness
 
 
@@ -41,16 +58,17 @@ p.n_elites = int(p.pop_size * 0.8)
 p.decrease_pop_factor = 1.0
 p.fraction_elites_reused = 0.0
 # Discrete
-p.dim_discrete = 4
-p.n_values = [2, 2, 2, 2]
+p.dim_discrete = 5
+p.n_values = [3] + [19 for _ in range(4)]
 p.init_probs = [
     [1.0 / p.n_values[i] for _ in range(p.n_values[i])] for i in range(p.dim_discrete)
 ]
 p.min_prob = 0.05
 # Continuous
-p.dim_continuous = 4
-p.max_value_continuous = np.full(p.dim_continuous, 2.0)
-p.min_value_continuous = np.full(p.dim_continuous, -2.0)
+MAX_N_PATCHES = 5
+p.dim_continuous = 2 * MAX_N_PATCHES
+p.max_value_continuous = np.full(p.dim_continuous, 1.0)
+p.min_value_continuous = np.full(p.dim_continuous, -1.0)
 p.init_mu_continuous = np.full(p.dim_continuous, 1.0)
 p.init_std_continuous = np.full(p.dim_continuous, 1.0)
 p.min_std_continuous = np.full(p.dim_continuous, 1e-3)
@@ -80,6 +98,8 @@ for k in range(p.cem_iters):
 
     cost_hist[k] = algo.log.best_value
 
+    ## Early exit
+
     # Print intermediate stats
     # print(algo.log.iterations, "(", algo.log.func_evals, "): ", algo.log.best_value)
     # print("discrete probabilities: \n", algo.probs)
@@ -90,6 +110,9 @@ for k in range(p.cem_iters):
 # Save wall-time
 end = time.time()
 wall_time = end - start
+
+xd = algo.best_discrete
+xc = algo.best_continuous
 
 # Generate and save report json
 report = {
